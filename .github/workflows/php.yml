@@ -1,0 +1,45 @@
+name: PHP
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+jobs:
+  php-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+
+      - name: Check PHP syntax
+        run: |
+          find . -name '*.php' -print0 | xargs -0 -n1 php -l
+
+      - name: Start API
+        run: |
+          php -S 127.0.0.1:8787 index.php > /tmp/anixart-api.log 2>&1 &
+          echo $! > /tmp/anixart-api.pid
+          sleep 1
+
+      - name: Smoke test API
+        run: |
+          curl --fail --silent --show-error \
+            'http://127.0.0.1:8787/history/1?token=test'
+          curl --fail --silent --show-error -X POST \
+            'http://127.0.0.1:8787/discover/watching/1?token=test'
+          curl --fail --silent --show-error -X POST \
+            'http://127.0.0.1:8787/auth/signIn'
+
+      - name: Stop API
+        if: always()
+        run: kill "$(cat /tmp/anixart-api.pid)" 2>/dev/null || true
